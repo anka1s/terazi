@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terazi — Teknik + Haber Sinyal Motoru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0D1117;
+    --panel:#161B22;
+    --panel-2:#1B212B;
+    --line: rgba(139,145,160,0.16);
+    --amber:#E8A33D;
+    --amber-dim: rgba(232,163,61,0.14);
+    --brick:#C1554D;
+    --brick-dim: rgba(193,85,77,0.14);
+    --slate:#5B7C99;
+    --slate-dim: rgba(91,124,153,0.16);
+    --parchment:#E7E2D5;
+    --muted:#8891A0;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--ink);
+    color:var(--parchment);
+    font-family:'Space Grotesk', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  a{ color:inherit; }
+  button, select, textarea, input{ font-family:inherit; color:inherit; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible{
+    outline:2px solid var(--amber); outline-offset:2px;
+  }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:28px 20px 64px; }
+
+  /* ---------- Header ---------- */
+  .topbar{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    gap:16px; margin-bottom:22px; flex-wrap:wrap;
+  }
+  .brand h1{
+    font-size:28px; font-weight:700; letter-spacing:-0.02em; margin:0 0 4px;
+  }
+  .brand p{ margin:0; color:var(--muted); font-size:13.5px; max-width:46ch; }
+  .controls{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .controls select{
+    background:var(--panel); border:1px solid var(--line); color:var(--parchment);
+    padding:8px 10px; font-size:13.5px;
+  }
+  .btn{
+    background:var(--panel); border:1px solid var(--line); color:var(--parchment);
+    padding:8px 14px; font-size:13.5px; cursor:pointer; transition:border-color .15s;
+  }
+  .btn:hover{ border-color:var(--muted); }
+  .btn-primary{ background:var(--amber); color:#1a1204; border-color:var(--amber); font-weight:600; }
+  .btn-primary:hover{ border-color:var(--amber); filter:brightness(1.06); }
+  .btn-danger{ color:var(--brick); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .toggle{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--muted); }
+  .switch{
+    width:34px; height:19px; border-radius:99px; background:var(--panel-2); border:1px solid var(--line);
+    position:relative; cursor:pointer; flex:none;
+  }
+  .switch::after{
+    content:''; position:absolute; width:13px; height:13px; border-radius:50%; background:var(--muted);
+    top:2px; left:2px; transition:left .15s, background .15s;
+  }
+  .switch.on{ border-color:var(--amber); }
+  .switch.on::after{ left:17px; background:var(--amber); }
+
+  /* ---------- Panel primitives ---------- */
+  .panel{
+    background:var(--panel); border:1px solid var(--line); padding:18px 20px; margin-bottom:16px;
+  }
+  .panel-title{
+    font-size:12.5px; color:var(--muted); margin:0 0 14px; font-weight:500;
+  }
+  .row{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .col{ flex:1 1 0; min-width:280px; }
+
+  /* ---------- Hero / verdict ---------- */
+  .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+  .verdict-badge{
+    display:inline-flex; align-items:center; gap:9px; font-size:26px; font-weight:700; letter-spacing:-0.01em;
+  }
+  .dot{ width:11px; height:11px; border-radius:50%; flex:none; }
+  .verdict-long{ color:var(--amber); }
+  .verdict-short{ color:var(--brick); }
+  .verdict-hold{ color:var(--slate); }
+  .price-tag{ text-align:right; }
+  .price-tag .p{ font-size:22px; font-weight:600; }
+  .price-tag .s{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  .meter{ margin:22px 0 14px; }
+  .meter-track{
+    position:relative; height:10px; background:var(--panel-2); border:1px solid var(--line);
+  }
+  .meter-fill-neg, .meter-fill-pos{ position:absolute; top:0; bottom:0; }
+  .meter-fill-neg{ right:50%; background:var(--brick); opacity:.55; }
+  .meter-fill-pos{ left:50%; background:var(--amber); opacity:.55; }
+  .meter-needle{
+    position:absolute; top:-5px; width:2px; height:20px; background:var(--parchment);
+    transition:left .4s ease;
+  }
+  .meter-thresh{ position:absolute; top:-3px; width:1px; height:16px; background:var(--muted); opacity:.5; }
+  .meter-labels{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
+
+  .chip-row{ display:flex; gap:10px; margin:16px 0 10px; flex-wrap:wrap; }
+  .chip{
+    display:flex; align-items:center; gap:7px; font-size:12.5px; padding:6px 11px;
+    background:var(--panel-2); border:1px solid var(--line);
+  }
+  .chip .val{ font-family:'IBM Plex Mono', monospace; }
+
+  .reason{ font-size:13.5px; color:var(--parchment); opacity:.85; line-height:1.5; margin:8px 0 0; }
+  .note{ font-size:11.5px; color:var(--muted); margin-top:4px; }
+
+  /* ---------- Indicator readouts ---------- */
+  .ind-list{ display:flex; flex-direction:column; gap:13px; }
+  .ind-item{ display:flex; flex-direction:column; gap:5px; }
+  .ind-top{ display:flex; justify-content:space-between; font-size:12.5px; }
+  .ind-label{ color:var(--muted); }
+  .ind-val{ font-family:'IBM Plex Mono', monospace; }
+  .bar-track{ height:6px; background:var(--panel-2); border:1px solid var(--line); position:relative; }
+  .bar-fill{ position:absolute; top:0; bottom:0; left:0; background:var(--slate); }
+  .bar-zone{ position:absolute; top:0; bottom:0; background:rgba(193,85,77,0.18); }
+
+  canvas{ max-width:100%; }
+  .chart-tabs{ display:flex; gap:6px; margin-bottom:12px; }
+  .chart-tab{
+    background:transparent; border:1px solid var(--line); color:var(--muted);
+    padding:5px 12px; font-size:12px; cursor:pointer;
+  }
+  .chart-tab.active{ color:var(--parchment); border-color:var(--muted); }
+
+  /* ---------- Sentiment ---------- */
+  textarea{
+    width:100%; min-height:96px; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--parchment); padding:10px 12px; font-size:13px; resize:vertical; line-height:1.5;
+  }
+  .sent-result{
+    border:1px solid var(--line); padding:14px 16px; height:100%;
+  }
+  .sent-label{ display:inline-flex; align-items:center; gap:8px; font-size:16px; font-weight:600; }
+  .sent-conf-track{ height:5px; background:var(--panel-2); border:1px solid var(--line); margin:10px 0; position:relative; }
+  .sent-conf-fill{ position:absolute; top:0; bottom:0; left:0; background:var(--slate); }
+  .sent-summary{ font-size:13px; opacity:.85; line-height:1.5; margin-top:8px; }
+  .method-tag{ font-size:10.5px; color:var(--muted); border:1px solid var(--line); padding:2px 7px; display:inline-block; margin-top:10px; }
+
+  /* ---------- Risk / portfolio ---------- */
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:14px; margin-bottom:16px; }
+  .stat{ }
+  .stat .l{ font-size:11.5px; color:var(--muted); margin-bottom:3px; }
+  .stat .v{ font-family:'IBM Plex Mono', monospace; font-size:19px; }
+  .stat .v.pos{ color:var(--amber); }
+  .stat .v.neg{ color:var(--brick); }
+
+  .halt-banner{
+    background:var(--brick-dim); border:1px solid var(--brick); color:var(--brick);
+    padding:10px 14px; font-size:13px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--line); font-size:11.5px; }
+  td{ padding:7px 8px; border-bottom:1px solid var(--line); font-family:'IBM Plex Mono', monospace; }
+  td.dir-long{ color:var(--amber); } td.dir-short{ color:var(--brick); }
+  .empty-row td{ color:var(--muted); font-family:'Space Grotesk', sans-serif; text-align:center; padding:16px 8px; }
+
+  .exec-row{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }
+  .exec-msg{ font-size:12.5px; color:var(--muted); }
+
+  footer{ text-align:center; color:var(--muted); font-size:11.5px; margin-top:26px; line-height:1.7; }
+  footer a{ text-decoration:underline; }
+
+  @media (prefers-reduced-motion: reduce){
+    .meter-needle, .switch::after{ transition:none !important; }
+  }
+  @media (max-width:640px){
+    .brand h1{ font-size:23px; }
+    .verdict-badge{ font-size:21px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>Terazi</h1>
+      <p>Teknik göstergeleri ve haber sentiment'ini tartıp tek bir karara varan sinyal motoru — kağıt üzerinde (simülasyon) çalışır.</p>
+    </div>
+    <div class="controls">
+      <select id="symbolSelect">
+        <option value="BTCUSDT">Bitcoin · BTC/USDT</option>
+        <option value="ETHUSDT">Ethereum · ETH/USDT</option>
+        <option value="SOLUSDT">Solana · SOL/USDT</option>
+      </select>
+      <div class="toggle" title="Açıkken 60 saniyede bir sinyali yeniden hesaplar VE geçerli bir AL/SAT sinyali çıkarsa kağıt üzerinde otomatik pozisyon açar.">
+        <span>Canlı (otomatik uygula)</span>
+        <div class="switch" id="liveSwitch" role="button" aria-pressed="false" tabindex="0"></div>
+      </div>
+      <button class="btn btn-primary" id="refreshBtn">Sinyali hesapla</button>
+    </div>
+  </div>
+
+  <!-- HERO: karar -->
+  <div class="panel" id="heroPanel">
+    <div class="hero-top">
+      <div>
+        <div class="verdict-badge verdict-hold" id="verdictBadge">
+          <span class="dot" style="background:var(--slate)" id="verdictDot"></span>
+          <span id="verdictText">Veri bekleniyor</span>
+        </div>
+      </div>
+      <div class="price-tag">
+        <div class="p mono" id="priceText">—</div>
+        <div class="s" id="updatedText">henüz hesaplanmadı</div>
+      </div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-track" id="meterTrack">
+        <div class="meter-fill-neg" id="meterNeg" style="width:0%"></div>
+        <div class="meter-fill-pos" id="meterPos" style="width:0%"></div>
+        <div class="meter-thresh" style="left:15%"></div>
+        <div class="meter-thresh" style="left:50%"></div>
+        <div class="meter-thresh" style="left:85%"></div>
+        <div class="meter-needle" id="meterNeedle" style="left:50%"></div>
+      </div>
+      <div class="meter-labels">
+        <span>SAT (−1.0)</span>
+        <span>nötr</span>
+        <span>AL (+1.0)</span>
+      </div>
+    </div>
+
+    <div class="chip-row">
+      <div class="chip"><span class="dot" style="width:7px;height:7px;background:var(--slate)"></span>Teknik <span class="val" id="chipTech">0.00</span></div>
+      <div class="chip"><span class="dot" style="width:7px;height:7px;background:var(--slate)"></span>Haber <span class="val" id="chipSent">0.00</span></div>
+      <div class="chip"><span class="dot" style="width:7px;height:7px;background:var(--amber)"></span>Sonuç <span class="val" id="chipComposite">0.00</span></div>
+    </div>
+
+    <p class="reason" id="reasonText">Sağ üstteki "Sinyali hesapla" düğmesine basarak ilk analizi başlatın.</p>
+    <p class="note" id="dataNote"></p>
+  </div>
+
+  <!-- Grafik + gösterge okumaları -->
+  <div class="row">
+    <div class="col" style="flex:1.6 1 0">
+      <div class="panel">
+        <p class="panel-title">Fiyat &amp; hareketli ortalamalar</p>
+        <div class="chart-tabs">
+          <button class="chart-tab active" data-view="price">Fiyat</button>
+          <button class="chart-tab" data-view="rsi">RSI</button>
+          <button class="chart-tab" data-view="macd">MACD</button>
+        </div>
+        <canvas id="mainChart" height="230"></canvas>
+      </div>
+    </div>
+    <div class="col" style="flex:1 1 0">
+      <div class="panel">
+        <p class="panel-title">Gösterge okumaları</p>
+        <div class="ind-list" id="indList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sentiment -->
+  <div class="panel">
+    <p class="panel-title">Haber sentiment analizi</p>
+    <div class="row">
+      <div class="col" style="flex:1.3 1 0">
+        <textarea id="headlinesInput">Bitcoin surges past key resistance as institutional demand grows
+Analysts warn of short-term correction after rapid rally
+Major exchange reports record trading volumes this week</textarea>
+        <div class="exec-row">
+          <button class="btn btn-primary" id="analyzeSentimentBtn">Haberleri analiz et</button>
+          <span class="exec-msg" id="sentStatus"></span>
+        </div>
+      </div>
+      <div class="col" style="flex:1 1 0">
+        <div class="sent-result">
+          <span class="sent-label verdict-hold" id="sentLabel">
+            <span class="dot" style="background:var(--slate)"></span>Bekleniyor
+          </span>
+          <div class="sent-conf-track"><div class="sent-conf-fill" id="sentConfFill" style="width:0%"></div></div>
+          <div class="note" id="sentConfText">güven: —</div>
+          <p class="sent-summary" id="sentSummary">Sol taraftaki örnek başlıkları düzenleyip "Haberleri analiz et" butonuna basın.</p>
+          <span class="method-tag" id="sentMethodTag">yöntem: —</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk / portföy -->
+  <div class="panel">
+    <p class="panel-title">Risk yönetimi &amp; kağıt üzerinde portföy (paper trading)</p>
+
+    <div class="halt-banner" id="haltBanner" style="display:none">
+      <span id="haltText"></span>
+      <button class="btn" id="resetHaltBtn" style="border-color:var(--brick); color:var(--brick)">Circuit breaker'ı sıfırla</button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="l">Sermaye</div><div class="v mono" id="statEquity">10,000.00</div></div>
+      <div class="stat"><div class="l">Zirve sermaye</div><div class="v mono" id="statPeak">10,000.00</div></div>
+      <div class="stat"><div class="l">Drawdown</div><div class="v mono" id="statDrawdown">0.00%</div></div>
+      <div class="stat"><div class="l">Günlük P&amp;L</div><div class="v mono" id="statDaily">0.00%</div></div>
+      <div class="stat"><div class="l">Açık pozisyon</div><div class="v mono" id="statOpen">0</div></div>
+      <div class="stat"><div class="l">Art arda kayıp</div><div class="v mono" id="statLosses">0</div></div>
+    </div>
+
+    <canvas id="equityChart" height="90"></canvas>
+
+    <div class="exec-row">
+      <button class="btn btn-primary" id="executeBtn" disabled>Sinyali simülasyonda uygula</button>
+      <button class="btn btn-danger" id="resetPortfolioBtn">Portföyü sıfırla</button>
+    </div>
+    <p class="exec-msg" id="execStatus" style="margin-top:8px"></p>
+
+    <p class="panel-title" style="margin-top:24px">Açık pozisyonlar</p>
+    <table id="openTable">
+      <thead><tr><th>Sembol</th><th>Yön</th><th>Kaldıraç</th><th>Giriş</th><th>Boyut</th><th>Stop</th><th>Hedef</th><th>Likidasyon</th><th>Anlık P&amp;L</th></tr></thead>
+      <tbody><tr class="empty-row"><td colspan="9">Açık pozisyon yok</td></tr></tbody>
+    </table>
+
+    <p class="panel-title" style="margin-top:20px">İşlem geçmişi</p>
+    <table id="historyTable">
+      <thead><tr><th>Sembol</th><th>Yön</th><th>Giriş</th><th>Çıkış</th><th>P&amp;L</th><th>Sebep</th></tr></thead>
+      <tbody><tr class="empty-row"><td colspan="6">Henüz kapanan işlem yok</td></tr></tbody>
+    </table>
+  </div>
+
+  <footer>
+    Terazi, kağıt üzerinde (paper trading) çalışan bir simülasyondur; gerçek borsaya emir göndermez ve yatırım tavsiyesi değildir.<br>
+    Bu arayüz, yerel <code>api_server.py</code> sunucusu üzerinden gerçek Python botuna (data_fetcher, indicators, main.SignalGenerator, risk_manager, ai_sentiment) bağlıdır. Sunucu çalışmıyorsa hiçbir veri gösterilemez.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // =========================================================================
+  // API istemcisi — tüm hesaplama api_server.py (gerçek Python botu) tarafında yapılır.
+  // Bu dosya sadece sonucu gösteren ince bir istemcidir.
+  // =========================================================================
+
+  const API_BASE = "";
+
+  async function apiGet(path){
+    const res = await fetch(API_BASE + path);
+    if (!res.ok){
+      let detail = res.statusText;
+      try { const data = await res.json(); detail = data.detail || detail; } catch(_e){}
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
+  async function apiPost(path, body){
+    const res = await fetch(API_BASE + path, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await res.json(); } catch(_e){}
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    return data;
+  }
+
+  const clip = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+
+  // =========================================================================
+  // UI DURUMU VE RENDER
+  // =========================================================================
+
+  let latestEnriched = [];       // backend'den gelen, indikatörleri eklenmiş mum verisi
+  let latestSignal = null;
+  let latestSentiment = { score:0, label:"neutral", confidence:0, method:"—", summary:null };
+  let portfolioData = null;      // { summary, openPositions, tradeHistory } — backend'den gelir
+  let currentSymbol = "BTCUSDT";
+  let liveTimer = null;
+  let mainChart = null, equityChart = null, chartView = "price";
+
+  const $ = (id)=>document.getElementById(id);
+
+  function fmt(n, d=2){ return Number(n).toLocaleString("en-US", {minimumFractionDigits:d, maximumFractionDigits:d}); }
+
+  function renderVerdict(signal, price, dataLive){
+    const badge = $("verdictBadge"), dot = $("verdictDot"), text = $("verdictText");
+    badge.className = "verdict-badge " + (signal.direction==="long"?"verdict-long":signal.direction==="short"?"verdict-short":"verdict-hold");
+    const color = signal.direction==="long" ? "var(--amber)" : signal.direction==="short" ? "var(--brick)" : "var(--slate)";
+    dot.style.background = color;
+    text.textContent = signal.direction==="long" ? "AL (LONG)" : signal.direction==="short" ? "SAT (SHORT)" : "BEKLE (HOLD)";
+
+    $("priceText").textContent = "$" + fmt(price, 2);
+    $("updatedText").textContent = (dataLive ? "canlı veri · " : "veri yok · ") + new Date().toLocaleTimeString("tr-TR");
+
+    const pct = (v)=> clip((v+1)/2, 0, 1)*100;
+    const needlePct = pct(signal.composite);
+    $("meterNeedle").style.left = needlePct + "%";
+    $("meterNeg").style.width = (50 - Math.min(50, needlePct)) + "%";
+    $("meterPos").style.width = (Math.max(50, needlePct) - 50) + "%";
+
+    $("chipTech").textContent = (signal.tech>=0?"+":"") + signal.tech.toFixed(2);
+    $("chipSent").textContent = (signal.sentiment>=0?"+":"") + signal.sentiment.toFixed(2);
+    $("chipComposite").textContent = (signal.composite>=0?"+":"") + signal.composite.toFixed(2);
+    $("reasonText").textContent = signal.reason;
+  }
+
+  function renderIndicators(row){
+    const items = [
+      { label:"RSI (14)", val:row.rsi, max:100, decimals:1 },
+      { label:"Stochastic %K", val:row.stochK, max:100, decimals:1 },
+      { label:"MACD histogram", val:row.macdHist, isRaw:true, decimals:2 },
+      { label:"ADX (trend gücü)", val:row.adx, max:50, decimals:1 },
+      { label:"OBV eğilimi", val:row.obv, isRaw:true, decimals:0 },
+    ];
+    const list = $("indList"); list.innerHTML = "";
+    items.forEach(it=>{
+      const wrap = document.createElement("div"); wrap.className = "ind-item";
+      const top = document.createElement("div"); top.className = "ind-top";
+      const lab = document.createElement("span"); lab.className="ind-label"; lab.textContent = it.label;
+      const val = document.createElement("span"); val.className="ind-val mono";
+      val.textContent = (it.val===undefined || it.val===null || Number.isNaN(it.val)) ? "—" : it.val.toFixed(it.decimals);
+      top.append(lab, val); wrap.appendChild(top);
+
+      if (!it.isRaw && it.val!==undefined && it.val!==null && !Number.isNaN(it.val)){
+        const track = document.createElement("div"); track.className="bar-track";
+        const fill = document.createElement("div"); fill.className="bar-fill";
+        fill.style.width = clip(it.val/it.max,0,1)*100 + "%";
+        track.appendChild(fill);
+        wrap.appendChild(track);
+      }
+      list.appendChild(wrap);
+    });
+  }
+
+  function renderSentiment(s){
+    const label = $("sentLabel");
+    const cls = s.label==="positive" ? "verdict-long" : s.label==="negative" ? "verdict-short" : "verdict-hold";
+    label.className = "sent-label " + cls;
+    const dotColor = s.label==="positive"?"var(--amber)":s.label==="negative"?"var(--brick)":"var(--slate)";
+    const txt = s.label==="positive"?"Pozitif":s.label==="negative"?"Negatif":"Nötr";
+    label.innerHTML = `<span class="dot" style="background:${dotColor}"></span>${txt} (${(s.score>=0?"+":"")}${s.score.toFixed(2)})`;
+    $("sentConfFill").style.width = (s.confidence*100) + "%";
+    $("sentConfText").textContent = "güven: " + (s.confidence*100).toFixed(0) + "%";
+    $("sentSummary").textContent = s.summary || "Özet üretilmedi.";
+    $("sentMethodTag").textContent = "yöntem: " + s.method;
+  }
+
+  function renderPortfolio(){
+    if (!portfolioData) return;
+    const s = portfolioData.summary;
+    $("statEquity").textContent = fmt(s.equity);
+    $("statPeak").textContent = fmt(s.peakEquity);
+    const dd = s.drawdownPct*100, daily = s.dailyPnlPct*100;
+    const ddEl = $("statDrawdown"); ddEl.textContent = dd.toFixed(2)+"%"; ddEl.className = "v mono" + (dd>0?" neg":"");
+    const dailyEl = $("statDaily"); dailyEl.textContent = (daily>=0?"+":"")+daily.toFixed(2)+"%"; dailyEl.className="v mono"+(daily<0?" neg":daily>0?" pos":"");
+    $("statOpen").textContent = s.openPositions;
+    $("statLosses").textContent = s.consecutiveLosses;
+
+    const banner = $("haltBanner");
+    if (s.tradingHalted){ banner.style.display="flex"; $("haltText").textContent = "İşlemler durduruldu: " + s.haltReason; }
+    else banner.style.display = "none";
+
+    const openBody = document.querySelector("#openTable tbody");
+    const positions = portfolioData.openPositions;
+    if (positions.length===0){ openBody.innerHTML = '<tr class="empty-row"><td colspan="9">Açık pozisyon yok</td></tr>'; }
+    else {
+      openBody.innerHTML = positions.map(p=>{
+        const dirSign = p.direction==="long"?1:-1;
+        const pnl = (p.lastPrice-p.entryPrice)*p.size*dirSign;
+        const liq = (p.liquidationPrice===null || p.liquidationPrice===undefined) ? "—" : fmt(p.liquidationPrice);
+        return `<tr><td>${p.symbol}</td><td class="dir-${p.direction}">${p.direction==="long"?"LONG":"SHORT"}</td>
+          <td>${p.leverage.toFixed(2)}x</td><td>${fmt(p.entryPrice)}</td><td>${p.size.toFixed(5)}</td><td>${fmt(p.stopLoss)}</td><td>${fmt(p.takeProfit)}</td>
+          <td class="dir-short">${liq}</td>
+          <td class="${pnl>=0?'dir-long':'dir-short'}">${pnl>=0?"+":""}${fmt(pnl)}</td></tr>`;
+      }).join("");
+    }
+
+    const histBody = document.querySelector("#historyTable tbody");
+    const hist = portfolioData.tradeHistory;
+    if (hist.length===0){ histBody.innerHTML = '<tr class="empty-row"><td colspan="6">Henüz kapanan işlem yok</td></tr>'; }
+    else {
+      histBody.innerHTML = hist.slice().reverse().slice(0,20).map(t=>`
+        <tr><td>${t.symbol}</td><td class="dir-${t.direction}">${t.direction==="long"?"LONG":"SHORT"}</td>
+        <td>${fmt(t.entryPrice)}</td><td>${fmt(t.exitPrice)}</td>
+        <td class="${t.pnl>=0?'dir-long':'dir-short'}">${t.pnl>=0?"+":""}${fmt(t.pnl)}</td><td>${t.reason}</td></tr>`).join("");
+    }
+
+    renderEquityChart();
+  }
+
+  function renderEquityChart(){
+    const hist = portfolioData ? portfolioData.tradeHistory : [];
+    const points = [{x:0, y:10000}, ...hist.map((t,i)=>({x:i+1, y: hist.slice(0,i+1).reduce((eq,tt)=>eq+tt.pnl,10000)}))];
+    const ctx = document.getElementById("equityChart");
+    const data = { labels: points.map(p=>p.x), datasets:[{ data: points.map(p=>p.y), borderColor:"#E8A33D", backgroundColor:"rgba(232,163,61,0.08)", fill:true, tension:0.25, pointRadius:0, borderWidth:2 }] };
+    const opts = { responsive:true, plugins:{legend:{display:false}}, scales:{
+      x:{ display:false }, y:{ grid:{color:"rgba(139,145,160,0.1)"}, ticks:{color:"#8891A0", font:{family:"IBM Plex Mono", size:10}} }
+    }};
+    if (equityChart){ equityChart.data=data; equityChart.update(); }
+    else equityChart = new Chart(ctx, { type:"line", data, options:opts });
+  }
+
+  function renderMainChart(){
+    const ctx = document.getElementById("mainChart");
+    const labels = latestEnriched.map(r=> new Date(r.time).toLocaleDateString("tr-TR",{month:"short",day:"numeric",hour:"2-digit"}));
+    let datasets = [];
+    if (chartView==="price"){
+      datasets = [
+        { label:"Kapanış", data: latestEnriched.map(r=>r.close), borderColor:"#E7E2D5", borderWidth:1.6, pointRadius:0, tension:0.15 },
+        { label:"SMA 20", data: latestEnriched.map(r=>r.sma20), borderColor:"#E8A33D", borderWidth:1.3, pointRadius:0, borderDash:[4,3], tension:0.15 },
+        { label:"SMA 50", data: latestEnriched.map(r=>r.sma50), borderColor:"#5B7C99", borderWidth:1.3, pointRadius:0, borderDash:[4,3], tension:0.15 },
+      ];
+    } else if (chartView==="rsi"){
+      datasets = [{ label:"RSI", data: latestEnriched.map(r=>r.rsi), borderColor:"#E8A33D", borderWidth:1.6, pointRadius:0, tension:0.15 }];
+    } else {
+      datasets = [
+        { label:"MACD", data: latestEnriched.map(r=>r.macd), borderColor:"#E8A33D", borderWidth:1.4, pointRadius:0, tension:0.15 },
+        { label:"Sinyal", data: latestEnriched.map(r=>r.macdSignal), borderColor:"#5B7C99", borderWidth:1.4, pointRadius:0, tension:0.15 },
+      ];
+    }
+    const data = { labels, datasets };
+    const opts = { responsive:true, interaction:{mode:"index", intersect:false}, plugins:{legend:{labels:{color:"#8891A0", font:{family:"Space Grotesk", size:11}}}},
+      scales:{ x:{ grid:{display:false}, ticks:{color:"#8891A0", maxTicksLimit:8, font:{family:"IBM Plex Mono", size:9}} },
+               y:{ grid:{color:"rgba(139,145,160,0.1)"}, ticks:{color:"#8891A0", font:{family:"IBM Plex Mono", size:10}} } } };
+    if (mainChart){ mainChart.data=data; mainChart.options=opts; mainChart.update(); }
+    else mainChart = new Chart(ctx, { type:"line", data, options:opts });
+  }
+
+  async function refreshPortfolio(){
+    try{
+      portfolioData = await apiGet("/api/portfolio");
+      renderPortfolio();
+    } catch(err){
+      console.warn("Portföy alınamadı:", err);
+    }
+  }
+
+  async function updateExecuteButton(){
+    const btn = $("executeBtn"), msg = $("execStatus");
+    if (!latestSignal || !latestSignal.direction){
+      btn.disabled = true; msg.textContent = "Şu an yürütülecek bir AL/SAT sinyali yok.";
+      return;
+    }
+    try{
+      const preview = await apiGet(`/api/preview?symbol=${encodeURIComponent(currentSymbol)}`);
+      if (preview.approved){
+        btn.disabled = false;
+        const liqTxt = (preview.liquidationPrice===null || preview.liquidationPrice===undefined) ? "—" : fmt(preview.liquidationPrice);
+        msg.textContent = `Onaylandı: ${preview.direction==="long"?"LONG":"SHORT"} · ${preview.leverage.toFixed(2)}x · boyut ${preview.size.toFixed(5)} · stop ${fmt(preview.stopLoss)} · hedef ${fmt(preview.takeProfit)} · likidasyon ${liqTxt}`;
+      } else {
+        btn.disabled = true; msg.textContent = "Risk yöneticisi reddetti: " + preview.reason;
+      }
+    } catch(err){
+      btn.disabled = true; msg.textContent = "Hata: " + err.message;
+    }
+  }
+
+  // =========================================================================
+  // ANA DÖNGÜ — her adımda gerçek botun /api/signal uç noktasından okunur
+  // =========================================================================
+
+  async function runOnce(){
+    $("refreshBtn").disabled = true; $("refreshBtn").textContent = "Hesaplanıyor…";
+    try{
+      const data = await apiGet(`/api/signal?symbol=${encodeURIComponent(currentSymbol)}`);
+      latestEnriched = data.candles;
+      latestSignal = data.signal;
+      latestSentiment = data.sentiment;
+
+      renderVerdict(latestSignal, data.price, data.live);
+      renderIndicators(latestEnriched[latestEnriched.length-1]);
+      renderMainChart();
+      renderSentiment(latestSentiment);
+      $("dataNote").textContent = "";
+
+      await refreshPortfolio();
+      await updateExecuteButton();
+      await maybeAutoExecute();
+    } catch(err){
+      $("reasonText").textContent = "Hata: " + err.message;
+      $("dataNote").textContent = "API sunucusuna ulaşılamadı — api_server.py çalışıyor mu? (uvicorn api_server:app --reload --port 8000)";
+    } finally {
+      $("refreshBtn").disabled = false; $("refreshBtn").textContent = "Sinyali hesapla";
+    }
+  }
+
+  // "Canlı" anahtarı açıkken geçerli bir AL/SAT sinyali çıkarsa botun kendisi
+  // (kağıt üzerinde) pozisyonu açar — buton bekletmeden. Zaten açık pozisyon
+  // varsa, risk yöneticisi reddederse ya da sinyal yoksa sessizce atlanır;
+  // bu beklenen ve sık karşılaşılan bir durumdur, hata değildir.
+  async function maybeAutoExecute(){
+    if (!$("liveSwitch").classList.contains("on")) return;
+    if (!latestSignal || !latestSignal.direction) return;
+    try{
+      const result = await apiPost("/api/execute", { symbol: currentSymbol });
+      const liqTxt = (result.liquidationPrice===null || result.liquidationPrice===undefined) ? "—" : fmt(result.liquidationPrice);
+      $("execStatus").textContent = `Otomatik uygulandı: ${result.direction==="long"?"LONG":"SHORT"} · ${result.leverage.toFixed(2)}x · boyut ${result.size.toFixed(5)} · stop ${fmt(result.stopLoss)} · hedef ${fmt(result.takeProfit)} · likidasyon ${liqTxt}`;
+      await refreshPortfolio();
+      await updateExecuteButton();
+    } catch(err){
+      console.info("Otomatik uygulama atlandı:", err.message);
+    }
+  }
+
+  async function handleAnalyzeSentiment(){
+    const btn = $("analyzeSentimentBtn"), status = $("sentStatus");
+    btn.disabled = true; status.textContent = "Analiz ediliyor…";
+    try{
+      const result = await apiPost("/api/sentiment", { symbol: currentSymbol, headlines: $("headlinesInput").value });
+      latestSentiment = result;
+      renderSentiment(latestSentiment);
+      await runOnce(); // yeni sentiment ile sinyali yeniden hesapla
+    } catch(err){
+      status.textContent = "Hata: " + err.message;
+    } finally {
+      btn.disabled = false;
+      if (status.textContent === "Analiz ediliyor…") status.textContent = "";
+    }
+  }
+
+  async function handleExecute(){
+    try{
+      const result = await apiPost("/api/execute", { symbol: currentSymbol });
+      const liqTxt = (result.liquidationPrice===null || result.liquidationPrice===undefined) ? "—" : fmt(result.liquidationPrice);
+      $("execStatus").textContent = `Simüle pozisyon açıldı: ${result.direction==="long"?"LONG":"SHORT"} · ${result.leverage.toFixed(2)}x · likidasyon ${liqTxt}`;
+      await refreshPortfolio();
+      await updateExecuteButton();
+    } catch(err){
+      $("execStatus").textContent = "Hata: " + err.message;
+    }
+  }
+
+  async function handleResetPortfolio(){
+    if (!confirm("Kağıt üzerindeki portföyü sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+    try{
+      await apiPost("/api/portfolio/reset", {});
+      await refreshPortfolio();
+      await updateExecuteButton();
+    } catch(err){
+      $("execStatus").textContent = "Hata: " + err.message;
+    }
+  }
+
+  async function handleResetHalt(){
+    try{
+      await apiPost("/api/portfolio/reset-halt", {});
+      await refreshPortfolio();
+      await updateExecuteButton();
+    } catch(err){
+      $("execStatus").textContent = "Hata: " + err.message;
+    }
+  }
+
+  function setLive(on){
+    $("liveSwitch").classList.toggle("on", on);
+    $("liveSwitch").setAttribute("aria-pressed", on);
+    if (liveTimer) clearInterval(liveTimer);
+    if (on) liveTimer = setInterval(runOnce, 60000);
+  }
+
+  // =========================================================================
+  // OLAY BAĞLAMA VE BAŞLANGIÇ
+  // =========================================================================
+
+  $("refreshBtn").addEventListener("click", runOnce);
+  $("symbolSelect").addEventListener("change", (e)=>{ currentSymbol = e.target.value; runOnce(); });
+  $("liveSwitch").addEventListener("click", ()=> setLive(!$("liveSwitch").classList.contains("on")));
+  $("liveSwitch").addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setLive(!$("liveSwitch").classList.contains("on")); } });
+  $("analyzeSentimentBtn").addEventListener("click", handleAnalyzeSentiment);
+  $("executeBtn").addEventListener("click", handleExecute);
+  $("resetPortfolioBtn").addEventListener("click", handleResetPortfolio);
+  $("resetHaltBtn").addEventListener("click", handleResetHalt);
+  document.querySelectorAll(".chart-tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      document.querySelectorAll(".chart-tab").forEach(t=>t.classList.remove("active"));
+      tab.classList.add("active"); chartView = tab.dataset.view;
+      if (latestEnriched.length) renderMainChart();
+    });
+  });
+
+  (async function init(){
+    await refreshPortfolio();
+    await runOnce();
+  })();
+
+})();
+</script>
+</body>
+</html>
